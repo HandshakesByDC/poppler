@@ -1,0 +1,376 @@
+
+ Host hs-github
+    User git
+    Hostname github.com
+    IdentityFile ~/.ssh/id_rsa@github-hs
+
+[remote "origin"]
+#url = git@github.com:HandshakesByDC/poppler.git
+ url = hs-github:HandshakesByDC/poppler.git
+fetch = +refs/heads/*:refs/remotes/origin/*
+
+dnf install openjpeg2-devel
+
+git clone git@github.com:HandshakesByDC/poppler.git
+cd poppler
+mkdir -p build
+cd build
+rm -f CMakeCache.txt
+cmake ..
+make
+
+
+
+./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ~/SEER/services/pdftodoc/0-original_1571026944371705_CrashOnWilby.pdf -
+
+
+
+[andrewsm@square poppler-mdda]$ git diff
+diff --git a/poppler/Gfx.cc b/poppler/Gfx.cc
+index 07d95b35..0b39bdf5 100644
+--- a/poppler/Gfx.cc
++++ b/poppler/Gfx.cc
+@@ -3937,6 +3937,7 @@ void Gfx::doShowText(GooString *s) {
+   wMode = font->getWMode();
+ 
+   if (out->useDrawChar()) {
++    //printf("ADASDAD"); // mdda  YES: This is used by HtmlOutputDev
+     out->beginString(state, s);
+   }
+ 
+@@ -4036,6 +4037,8 @@ void Gfx::doShowText(GooString *s) {
+ 
+   } else if (out->useDrawChar()) {
+     p = s->getCString();
++    //printf("-%s", p);   // mdda  (A Clue!) : I-NTRO-DUC-T-I-ON    -T-H-E- C-O-D-E-
++      
+     len = s->getLength();
+     while (len > 0) {
+       n = font->getNextChar(p, len, &code,
+@@ -4062,6 +4065,24 @@ void Gfx::doShowText(GooString *s) {
+       if (ocState)
+         out->drawChar(state, state->getCurX() + riseX, state->getCurY() + riseY,
+                      tdx, tdy, tOriginX, tOriginY, code, n, u, uLen);
++
++// mdda : This is from TextOutputDev.cc#4574
++//     out->drawChar(state, sel->word->textMat[i].m[4], sel->word->textMat[i].m[5], 0, 0, 0, 0,
++//                   sel->word->charcode[i], 1, NULL, 0);
++
++  if(0) { // mdda START     -1I+1I-1n+1N-1t+1T-1r+1R-1o+1O-1D+1D-1U+1U-1C+1C-1t+1T-1I+1I-1o+1O-1n+1N
++          if(1) { // mdda START   (-I-n-t-r-o-D-U-C-t-I-o-n)
++            printf("-%d", uLen);
++            for (int i = 0; i < uLen; ++i) {
++              printf("%c", u[i]);
++            }
++          } // mdda END
++          if(1) { // mdda START   (+I+N+T+R+O+D+U+C+T+I+O+N) 
++            printf("+%d%c", n, code);
++          } // mdda END
++  } // mdda END
++                      
++                      
+       state->shift(tdx, tdy);
+       p += n;
+       len -= n;
+@@ -4099,6 +4120,8 @@ void Gfx::doShowText(GooString *s) {
+     state->textTransformDelta(dx, dy, &tdx, &tdy);
+     if (ocState)
+       out->drawString(state, s);
++
++    //printf("BOZO"); // mdda (not called for HTMLOutputDev
+     state->shift(tdx, tdy);
+   }
+ 
+diff --git a/poppler/GfxFont.cc b/poppler/GfxFont.cc
+index 81f59037..347e661b 100644
+--- a/poppler/GfxFont.cc
++++ b/poppler/GfxFont.cc
+@@ -1666,6 +1666,9 @@ int Gfx8BitFont::getNextChar(char *s, int len, CharCode *code,
+   *uLen = ctu->mapToUnicode(c, u);
+   *dx = widths[c];
+   *dy = *ox = *oy = 0;
++  
++//  printf(" %c", *code);   // mdda 
++  
+   return 1;
+ }
+ 
+@@ -2241,6 +2244,8 @@ int GfxCIDFont::getNextChar(char *s, int len, CharCode *code,
+   *ox = vx;
+   *oy = vy;
+ 
++  // printf("$%c", *code);   // mdda == Only odd characters
++
+   return n;
+ }
+ 
+diff --git a/utils/HtmlOutputDev.cc b/utils/HtmlOutputDev.cc
+index 35e98b46..793073b7 100644
+--- a/utils/HtmlOutputDev.cc
++++ b/utils/HtmlOutputDev.cc
+@@ -235,6 +235,11 @@ HtmlString::~HtmlString() {
+ 
+ void HtmlString::addChar(GfxState *state, double x, double y,
+                         double dx, double dy, Unicode u) {
++                                 
++  if(0) { // mdda START  
++    printf("%c", u);  // HtmlString::addChar  (IntroDUCtIon)
++  } // mdda END
++                                 
+   if (dir == textDirUnknown) {
+     //dir = UnicodeMap::getDirection(u);
+     dir = textDirLeftRight;
+@@ -370,6 +375,12 @@ void HtmlPage::addChar(GfxState *state, double x, double y,
+   int n, i;
+   state->transform(x, y, &x1, &y1);
+   n = curStr->len;
++
++  if(0) { // mdda START   (IntroDUCtIon)
++    for (i = 0; i < uLen; ++i) {
++      printf("%c", u[i]);
++    }
++  } // mdda END
+  
+   // check that new character is in the same direction as current string
+   // and is not too far away from it before adding 
+@@ -410,6 +421,7 @@ void HtmlPage::addChar(GfxState *state, double x, double y,
+   }
+   for (i = 0; i < uLen; ++i) {
+     curStr->addChar(state, x1 + i*w1, y1 + i*h1, w1, h1, u[i]);
++    //printf("%c", u[i]); // mdda addChar  (IntroDUCtIon)
+   }
+ }
+ 
+@@ -763,10 +775,46 @@ void HtmlPage::dumpAsXML(FILE* f,int page){
+ 
+   for(HtmlString *tmp=yxStrings;tmp;tmp=tmp->yxNext){
+     if (tmp->htext){
++      // mdda new START  :: Remove trailing space, since it can screw up column widths
++      char *cstr = tmp->htext->getCString();
++      double width = (tmp->xMax-tmp->xMin);
++      int len = strlen(cstr);
++      if(1){ // mdda
++        if(tmp->len>1 && len>1 && cstr[len-1] == ' ') {
++          width -= (tmp->xRight[tmp->len-1] - tmp->xRight[tmp->len-2]);
++       }
++      }
++      // mdda new END
++      
++      // mdda new START  :: Check for 'l o n d o n  S c h o o l' spacing problem
++      if(1){ // mdda
++        if(len>3 && cstr[1] == ' ') {  // Second character a space is quickest check
++          int all_spaced=true;
++          for(int j=3; j<len; j+=2) {
++            if(cstr[j] != ' ') {
++              all_spaced=false;
++            }
++          }
++          if(all_spaced) {
++            //printf("\nAll Spaced : %s\n", cstr);
++            for(int j=0; j<len; j+=2) {
++              cstr[j/2] = cstr[j];
++              cstr[len/2] = '\0';  // terminate it
++            }
++            //printf("Re- Spaced : %s\n", cstr);
++          }
++        }
++      }
++      // mdda new END
++      
+       fprintf(f,"<text top=\"%d\" left=\"%d\" ",xoutRound(tmp->yMin),xoutRound(tmp->xMin));
+-      fprintf(f,"width=\"%d\" height=\"%d\" ",xoutRound(tmp->xMax-tmp->xMin),xoutRound(tmp->yMax-tmp->yMin));
++      
++      //fprintf(f,"width=\"%d\" height=\"%d\" ",xoutRound(tmp->xMax-tmp->xMin),xoutRound(tmp->yMax-tmp->yMin)); // mdda DEL
++      fprintf(f,"width=\"%d\" height=\"%d\" ",xoutRound(width),xoutRound(tmp->yMax-tmp->yMin));  // mdda NEW
++      
+       fprintf(f,"font=\"%d\">", tmp->fontpos);
+-      fputs(tmp->htext->getCString(),f);
++      fputs(cstr,f);  // mdda NEW
++      //fputs(tmp->htext->getCString(),f);  // mdda DEL
+       fputs("</text>\n",f);
+     }
+   }
+@@ -1312,12 +1360,38 @@ void HtmlOutputDev::endString(GfxState *state) {
+ void HtmlOutputDev::drawChar(GfxState *state, double x, double y,
+              double dx, double dy,
+              double originX, double originY,
+-             CharCode code, int /*nBytes*/, Unicode *u, int uLen) 
++             //CharCode code, int /*nBytes*/, Unicode *u, int uLen)  // mdda DEL
++             CharCode code, int nBytes, Unicode *u, int uLen)  // mdda NEW
+ {
++  Unicode u_code = 0; // mdda 
++
+   if ( !showHidden && (state->getRender() & 3) == 3) {
+     return;
+   }
+-  pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);
++  
++  if(0) { // mdda START   (IntroDUCtIon)
++    for (int i = 0; i < uLen; ++i) {
++      printf("%c", u[i]);  // drawChar
++    }
++  } // mdda END
++  if(0) { // mdda START   (=I=N=T=R=O=D=U=C=T=I=O=N)
++    printf("=%c", code);  // drawChar
++  } // mdda END
++
++  if(1) {// mdda bodge START  -- This checks to see whether the unicode is just length=1, and then substitutes in the 'code' instead
++    if(nBytes == 1 && ((code & 0x7f) == code)) {
++      u_code = code;
++      pages->addChar(state, x, y, dx, dy, originX, originY, &u_code, 1);
++    } 
++    else {
++      pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);
++    }
++  }
++  else {
++    pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);   
++  }  // mdda bodge END
++  
++  //pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);   // mdda DEL
+ }
+ 
+ void HtmlOutputDev::drawJpegImage(GfxState *state, Stream *str)
+diff --git a/utils/pdftotext.cc b/utils/pdftotext.cc
+index d931a969..579a83f7 100644
+--- a/utils/pdftotext.cc
++++ b/utils/pdftotext.cc
+@@ -37,6 +37,7 @@
+ #include <stdlib.h>
+ #include <stddef.h>
+ #include <string.h>
++#include <math.h>  // mdda
+ #include "parseargs.h"
+ #include "printencodings.h"
+ #include "goo/GooString.h"
+@@ -516,7 +517,7 @@ void printLine(FILE *f, TextLine *line) {
+ 
+ void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
+   double xMin, yMin, xMax, yMax;
+-  TextPage *textPage;
++  //TextPage *textPage;
+   TextFlow *flow;
+   TextBlock *blk;
+   TextLine *line;
+@@ -525,7 +526,7 @@ void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int l
+   for (int page = first; page <= last; ++page) {
+     fprintf(f, "  <page width=\"%f\" height=\"%f\">\n",doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
+     doc->displayPage(textOut, page, resolution, resolution, 0, gTrue, gFalse, gFalse);
+-    textPage = textOut->takeText();
++    TextPage *textPage = textOut->takeText();
+     for (flow = textPage->getFlows(); flow; flow = flow->getNext()) {
+       fprintf(f, "    <flow>\n");
+       for (blk = flow->getBlocks(); blk; blk = blk->getNext()) {
+@@ -544,6 +545,8 @@ void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int l
+   fprintf(f, "</doc>\n");
+ }
+ 
++#define MDDA_VERSION 1
++#ifndef MDDA_VERSION
+ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
+   fprintf(f, "<doc>\n");
+   for (int page = first; page <= last; ++page) {
+@@ -567,3 +570,101 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int
+   }
+   fprintf(f, "</doc>\n");
+ }
++#endif
++
++#ifdef MDDA_VERSION
++void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
++  fprintf(f, "<doc>\n");
++  
++  GooString *invalid_font_name = new GooString("-INVALID-FONT-NAME-");
++
++  for (int page = first; page <= last; ++page) {
++    fprintf(f, " <page n=\"%d\" width=\"%.2f\" height=\"%.2f\">\n", page, doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
++    doc->displayPage(textOut, page, resolution, resolution, 0, gTrue, gFalse, gFalse);
++    TextWordList *wordlist = textOut->makeWordList();
++    const int word_length = wordlist != NULL ? wordlist->getLength() : 0;
++    
++    // All the _prev values must be nonsense, to ensure that they are reset (and emitted) at the beginning of each page
++    
++    TextWord *word;
++    double xMinA, xMaxA, yMinA, yMaxA, yMinA_prev=-1.0, yMaxA_prev=-1.0;
++    
++    TextFontInfo *fontinfo;
++    int is_bold, is_italic, is_bold_prev=-1, is_italic_prev=-1; 
++    double fontsize, fontsize_prev=-1.0;
++    double cr,cg,cb, cr_prev=-1,cg_prev=-1,cb_prev=-1;
++    
++    GBool space_after;
++    GooString *fontname, *fontname_prev = invalid_font_name;
++    
++    if (word_length == 0)
++      fprintf(stderr, "no word list (page %d empty)\n", page);
++
++    for (int i = 0; i < word_length; ++i) {
++      std::stringstream wordXML;
++      wordXML << std::fixed << std::setprecision(2);
++
++      std::stringstream wordRGB;
++      wordRGB << std::hex << std::setfill('0') << std::setw(2) << std::right;
++      
++      word = wordlist->get(i);
++      word->getBBox(&xMinA, &yMinA, &xMaxA, &yMaxA);
++      const std::string myString = myXmlTokenReplace(word->getText()->getCString());
++
++      fontinfo = word->getFontInfo(0);
++      is_bold = fontinfo->isBold() ? 1:0;
++      is_italic = fontinfo->isItalic() ?1:0;
++
++      fontsize = word->getFontSize(); 
++      fontname = word->getFontName(0);
++      word->getColor(&cr,&cg,&cb);
++    
++      space_after = word->hasSpaceAfter();
++      
++      wordXML << "  <word xMin=\"" << xMinA << "\" xMax=\"" << xMaxA << "\"";
++      
++      if( fabs(yMinA-yMinA_prev)>0.05 || fabs(yMaxA-yMaxA_prev)>0.05 ) {
++        wordXML << " yMin=\"" << yMinA << "\" yMax=\"" << yMaxA << "\"";
++        yMinA_prev = yMinA;
++        yMaxA_prev = yMaxA;
++      }
++      
++      if( is_bold != is_bold_prev ) {
++        wordXML << " b=\"" << (is_bold?"1":"0") << "\"";
++        is_bold_prev = is_bold;
++      }
++      
++      if( is_italic != is_italic_prev ) {
++        wordXML << " i=\"" << (is_italic?"1":"0") << "\"";
++        is_italic_prev = is_italic;
++      }
++      
++      if( fontsize != fontsize_prev || fontname->cmp(fontname_prev)!=0 ) {
++        wordXML << " fontSize=\"" << fontsize << "\" fontName=\"" << fontname->getCString() << "\"";
++        fontsize_prev = fontsize;
++        fontname_prev = fontname;
++      }
++      
++      if( cr!=cr_prev || cg!=cg_prev || cb!=cb_prev ) {
++        wordRGB << (int)(cr*255) << (int)(cg*255) << (int)(cb*255);
++        wordXML << " rgb=\"" << wordRGB.str() << "\"";
++        cr_prev=cr;
++        cg_prev=cg;
++        cb_prev=cb;
++        //wordRGB.str(""); // Clear the stream?
++      }
++      
++      if( !space_after ) {
++        wordXML << " noSpace=\"1\"";
++      }
++      
++      wordXML << ">" << myString << "</word>\n";
++      
++      fputs(wordXML.str().c_str(), f);
++    }
++    fprintf(f, " </page>\n");
++    delete wordlist;
++  }
++  fprintf(f, "</doc>\n");
++}
++#endif
+[andrewsm@square poppler-mdda]$ 
+
