@@ -771,6 +771,7 @@ void HtmlPage::dumpAsXML(FILE* f,int page){
     }
   }
   fputs("</page>\n",f);
+  //fputs("blarg\n",f);  // mdda : This proves that this function is not used by pdftotext - there are changes to be made in notes_mdda.txt
 }
 
 static void printCSS(FILE *f)
@@ -1304,6 +1305,7 @@ void HtmlOutputDev::drawChar(GfxState *state, double x, double y,
     return;
   }
   pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);
+  // printf("blarg\n");  // mdda : This proves that this function is not used by pdftotext - there are changes to be made in notes_mdda.txt
 }
 
 void HtmlOutputDev::drawJpegImage(GfxState *state, Stream *str)

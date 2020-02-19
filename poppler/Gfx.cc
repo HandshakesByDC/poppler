@@ -3890,6 +3890,7 @@ void Gfx::doShowText(const GooString *s) {
   wMode = font->getWMode();
 
   if (out->useDrawChar()) {
+    //printf("Used in pdftotext");  // YES
     out->beginString(state, s);
   }
 
@@ -4036,6 +4037,19 @@ void Gfx::doShowText(const GooString *s) {
       if (ocState)
         out->drawChar(state, state->getCurX() + riseX, state->getCurY() + riseY,
 		      tdx, tdy, tOriginX, tOriginY, code, n, u, uLen);
+
+  if(0) { // NOOP  // mdda START     -1I+1I-1n+1N-1t+1T-1r+1R-1o+1O-1D+1D-1U+1U-1C+1C-1t+1T-1I+1I-1o+1O-1n+1N
+          if(1) { // mdda START   (-I-n-t-r-o-D-U-C-t-I-o-n)
+            printf("-%d", uLen);
+            for (int i = 0; i < uLen; ++i) {
+              printf("%c", u[i]);
+            }
+          } // mdda END
+          if(1) { // mdda START   (+I+N+T+R+O+D+U+C+T+I+O+N) 
+            printf("+%d%c", n, code);
+          } // mdda END
+  } // mdda END
+
       state->shift(tdx, tdy);
       p += n;
       len -= n;

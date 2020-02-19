@@ -551,8 +551,11 @@ void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int l
     fprintf(f, "  </page>\n");
   }
   fprintf(f, "</doc>\n");
+  //printf("blarg\n");   // mdda : This isn't used in the HS pdftotext use-case
 }
 
+#define MDDA_VERSION 1
+#ifndef MDDA_VERSION
 void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
   fprintf(f, "<doc>\n");
   for (int page = first; page <= last; ++page) {
@@ -576,3 +579,30 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
   }
   fprintf(f, "</doc>\n");
 }
+#endif
+
+#ifdef MDDA_VERSION
+void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
+  fprintf(f, "<doc>\n");
+  for (int page = first; page <= last; ++page) {
+    fprintf(f, "  <page width=\"%f\" height=\"%f\">\n",doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
+    doc->displayPage(textOut, page, resolution, resolution, 0, true, false, false);
+    TextWordList *wordlist = textOut->makeWordList();
+    const int word_length = wordlist != nullptr ? wordlist->getLength() : 0;
+    TextWord *word;
+    double xMinA, yMinA, xMaxA, yMaxA;
+    if (word_length == 0)
+      fprintf(stderr, "no word list\n");
+
+    for (int i = 0; i < word_length; ++i) {
+      word = wordlist->get(i);
+      word->getBBox(&xMinA, &yMinA, &xMaxA, &yMaxA);
+      const std::string myString = myXmlTokenReplace(word->getText()->c_str());
+      fprintf(f,"    <word xMin=\"%f\" yMin=\"%f\" xMax=\"%f\" yMax=\"%f\">%s</word>\n", xMinA, yMinA, xMaxA, yMaxA, myString.c_str());
+    }
+    fprintf(f, "  </page>\n");
+    delete wordlist;
+  }
+  fprintf(f, "</doc mdda>\n");
+}
+#endif

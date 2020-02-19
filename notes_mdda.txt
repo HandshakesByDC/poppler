@@ -20,10 +20,18 @@ cmake ..
 make
 
 
+GOODPDF=~/SEER/services/textextract/server/cache/DA350094-CB0B-4C05-9444-762313D4AB98/0/0-original.pdf
+BADPDF=~/SEER/services/pdftodoc/0-original_1571026944371705_CrashOnWilby.pdf
 
-./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ~/SEER/services/pdftodoc/0-original_1571026944371705_CrashOnWilby.pdf -
+# Bad Fails on 0.37+mdda = N/a
+# Both Work on git head > 0.83.0 = 39baa7d42966ebd67c2ac91ef1c1450965c37e87
+TESTPDF=${GOODPDF}
+TESTPDF=${BADPDF}
+./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ${TESTPDF} -
 
 
+
+----- Add this one - NOOP-ed out ----- 
 
 [andrewsm@square poppler-mdda]$ git diff
 diff --git a/poppler/Gfx.cc b/poppler/Gfx.cc
@@ -38,6 +46,8 @@ index 07d95b35..0b39bdf5 100644
      out->beginString(state, s);
    }
  
+----- Ignore following file changes ----- 
+
 @@ -4036,6 +4037,8 @@ void Gfx::doShowText(GooString *s) {
  
    } else if (out->useDrawChar()) {
@@ -51,6 +61,9 @@ index 07d95b35..0b39bdf5 100644
        if (ocState)
          out->drawChar(state, state->getCurX() + riseX, state->getCurY() + riseY,
                       tdx, tdy, tOriginX, tOriginY, code, n, u, uLen);
+
+----- Add this one - NOOP-ed out ----- 
+
 +
 +// mdda : This is from TextOutputDev.cc#4574
 +//     out->drawChar(state, sel->word->textMat[i].m[4], sel->word->textMat[i].m[5], 0, 0, 0, 0,
@@ -81,6 +94,8 @@ index 07d95b35..0b39bdf5 100644
      state->shift(tdx, tdy);
    }
  
+----- Ignore following file changes ----- 
+
 diff --git a/poppler/GfxFont.cc b/poppler/GfxFont.cc
 index 81f59037..347e661b 100644
 --- a/poppler/GfxFont.cc
@@ -104,6 +119,8 @@ index 81f59037..347e661b 100644
    return n;
  }
  
+----- Ignore following file changes ----- 
+
 diff --git a/utils/HtmlOutputDev.cc b/utils/HtmlOutputDev.cc
 index 35e98b46..793073b7 100644
 --- a/utils/HtmlOutputDev.cc
@@ -141,6 +158,9 @@ index 35e98b46..793073b7 100644
    }
  }
  
+ 
+----- Don't add this one - Not used by pdftotext ----- 
+
 @@ -763,10 +775,46 @@ void HtmlPage::dumpAsXML(FILE* f,int page){
  
    for(HtmlString *tmp=yxStrings;tmp;tmp=tmp->yxNext){
@@ -190,6 +210,9 @@ index 35e98b46..793073b7 100644
        fputs("</text>\n",f);
      }
    }
+
+----- Don't add this one - Not used by pdftotext ----- 
+
 @@ -1312,12 +1360,38 @@ void HtmlOutputDev::endString(GfxState *state) {
  void HtmlOutputDev::drawChar(GfxState *state, double x, double y,
               double dx, double dy,
@@ -230,7 +253,6 @@ index 35e98b46..793073b7 100644
 +  //pages->addChar(state, x, y, dx, dy, originX, originY, u, uLen);   // mdda DEL
  }
  
- void HtmlOutputDev::drawJpegImage(GfxState *state, Stream *str)
 diff --git a/utils/pdftotext.cc b/utils/pdftotext.cc
 index d931a969..579a83f7 100644
 --- a/utils/pdftotext.cc
@@ -244,7 +266,10 @@ index d931a969..579a83f7 100644
  #include "printencodings.h"
  #include "goo/GooString.h"
 @@ -516,7 +517,7 @@ void printLine(FILE *f, TextLine *line) {
+
  
+----- Don't add this one - Not used by HS pdftotext ----- 
+
  void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
    double xMin, yMin, xMax, yMax;
 -  TextPage *textPage;
