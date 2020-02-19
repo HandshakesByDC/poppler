@@ -586,8 +586,8 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
 void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
   fprintf(f, "<doc>\n");
   
-  GooString *font_name_invalid  = new GooString("-INVALID-FONT-NAME-"); 
-  GooString *font_name_null_fix = new GooString("-NULL-FONT-NAME-"); 
+  GooString *font_name_invalid  = new GooString("-FONT-NAME-INVALID-"); 
+  GooString *font_name_null_fix = new GooString("-FONT-NAME-NULL-"); 
   
   for (int page = first; page <= last; ++page) {
     fprintf(f, " <page n=\"%d\" width=\"%.2f\" height=\"%.2f\">\n", page, doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
@@ -609,7 +609,7 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
     double cr,cg,cb, cr_prev=-1,cg_prev=-1,cb_prev=-1;
     
     bool space_after=false;
-    const GooString *fontname_prev=new GooString(""); 
+    const GooString *fontname_prev=font_name_invalid->copy(); 
     
     if (word_length == 0) {
       fprintf(stderr, "no word list (page %d empty)\n", page);
@@ -634,7 +634,7 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
       fontsize = word->getFontSize(); 
       const GooString *fontname = word->getFontName(0);  // TEXTOUT_WORD_LIST is defined - looking at [idx=0] font 
       if(fontname == nullptr) {
-        printf("fixing null fontname (rare)");
+        //printf("fixing null fontname (rare)");
         fontname=font_name_null_fix->copy();
       }
       word->getColor(&cr,&cg,&cb);
@@ -690,7 +690,7 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
       // Old version : 
       //fprintf(f,"    <word xMin=\"%f\" yMin=\"%f\" xMax=\"%f\" yMax=\"%f\">%s</word>\n", xMinA, yMinA, xMaxA, yMaxA, myString.c_str());
       
-      // delete fontname;  // Don't free someone else's string (name)
+      // delete fontname;  // Don't free someone else's string (word->getFontName(0))
     }
     fprintf(f, "  </page>\n");
     delete wordlist;
