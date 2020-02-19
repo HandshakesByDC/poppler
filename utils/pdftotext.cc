@@ -43,6 +43,7 @@
 #include <cstdlib>
 #include <cstddef>
 #include <cstring>
+#include <math.h>  // mdda for fabs() below
 #include "parseargs.h"
 #include "printencodings.h"
 #include "goo/GooString.h"
@@ -584,25 +585,120 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
 #ifdef MDDA_VERSION
 void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
   fprintf(f, "<doc>\n");
+  
+  GooString *font_name_invalid  = new GooString("-INVALID-FONT-NAME-"); 
+  GooString *font_name_null_fix = new GooString("-NULL-FONT-NAME-"); 
+  
   for (int page = first; page <= last; ++page) {
-    fprintf(f, "  <page width=\"%f\" height=\"%f\">\n",doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
+    fprintf(f, " <page n=\"%d\" width=\"%.2f\" height=\"%.2f\">\n", page, doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
+    
     doc->displayPage(textOut, page, resolution, resolution, 0, true, false, false);
+    
     TextWordList *wordlist = textOut->makeWordList();
     const int word_length = wordlist != nullptr ? wordlist->getLength() : 0;
+    
+    // All the _prev values are likely nonsense at the start of a page, so ensure that they are reset (and emitted) at the beginning of each page
+    
     TextWord *word;
-    double xMinA, yMinA, xMaxA, yMaxA;
-    if (word_length == 0)
-      fprintf(stderr, "no word list\n");
+    double xMinA, xMaxA, yMinA, yMaxA, yMinA_prev=-1.0, yMaxA_prev=-1.0;
 
+    const TextFontInfo *fontinfo;
+    
+    int is_bold, is_italic, is_bold_prev=-1, is_italic_prev=-1; 
+    double fontsize, fontsize_prev=-1.0;
+    double cr,cg,cb, cr_prev=-1,cg_prev=-1,cb_prev=-1;
+    
+    bool space_after=false;
+    const GooString *fontname_prev=new GooString(""); 
+    
+    if (word_length == 0) {
+      fprintf(stderr, "no word list (page %d empty)\n", page);
+    }
+    
     for (int i = 0; i < word_length; ++i) {
+      std::stringstream wordXML;
+      wordXML << std::fixed << std::setprecision(2);
+
+      std::stringstream wordRGB;
+      wordRGB << std::hex << std::setfill('0') << std::setw(2) << std::right;
+      
       word = wordlist->get(i);
       word->getBBox(&xMinA, &yMinA, &xMaxA, &yMaxA);
       const std::string myString = myXmlTokenReplace(word->getText()->c_str());
-      fprintf(f,"    <word xMin=\"%f\" yMin=\"%f\" xMax=\"%f\" yMax=\"%f\">%s</word>\n", xMinA, yMinA, xMaxA, yMaxA, myString.c_str());
+      // Major update here
+
+      fontinfo = word->getFontInfo(0);
+      is_bold = fontinfo->isBold() ? 1:0;
+      is_italic = fontinfo->isItalic() ?1:0;
+
+      fontsize = word->getFontSize(); 
+      const GooString *fontname = word->getFontName(0);  // TEXTOUT_WORD_LIST is defined - looking at [idx=0] font 
+      if(fontname == nullptr) {
+        printf("fixing null fontname (rare)");
+        fontname=font_name_null_fix->copy();
+      }
+      word->getColor(&cr,&cg,&cb);
+    
+      space_after = word->hasSpaceAfter();
+      
+      wordXML << "  <word xMin=\"" << xMinA << "\" xMax=\"" << xMaxA << "\"";
+
+      if( fabs(yMinA-yMinA_prev)>0.05 || fabs(yMaxA-yMaxA_prev)>0.05 ) {
+        wordXML << " yMin=\"" << yMinA << "\" yMax=\"" << yMaxA << "\"";
+        yMinA_prev = yMinA;
+        yMaxA_prev = yMaxA;
+      }
+      
+      if( is_bold != is_bold_prev ) {
+        wordXML << " b=\"" << (is_bold?"1":"0") << "\"";
+        is_bold_prev = is_bold;
+      }
+
+      if( is_italic != is_italic_prev ) {
+        wordXML << " i=\"" << (is_italic?"1":"0") << "\"";
+        is_italic_prev = is_italic;
+      }
+
+      //printf("fontname[%ld] ", (long)fontname);
+      //printf("fontsize[%ld] ", (long)fontsize);
+      
+      // Caused segfault on BADPDF because some fontnames are NULL : Fix this up above
+      if( fontsize != fontsize_prev || fontname->cmp(fontname_prev)!=0 ) {
+        wordXML << " fontSize=\"" << fontsize << "\" fontName=\"" << fontname->c_str() << "\"";
+        fontsize_prev = fontsize;
+        fontname_prev = fontname->copy();
+      }
+
+      if( cr!=cr_prev || cg!=cg_prev || cb!=cb_prev ) {
+        wordRGB << (int)(cr*255) << (int)(cg*255) << (int)(cb*255);
+        wordXML << " rgb=\"" << wordRGB.str() << "\"";
+        cr_prev=cr;
+        cg_prev=cg;
+        cb_prev=cb;
+        //wordRGB.str(""); // Clear the stream?
+      }
+      
+      if( !space_after ) {
+        wordXML << " noSpace=\"1\"";
+      }
+
+      wordXML << ">" << myString << "</word>\n";
+
+      // New version : 
+      fputs(wordXML.str().c_str(), f);
+
+      // Old version : 
+      //fprintf(f,"    <word xMin=\"%f\" yMin=\"%f\" xMax=\"%f\" yMax=\"%f\">%s</word>\n", xMinA, yMinA, xMaxA, yMaxA, myString.c_str());
+      
+      // delete fontname;  // Don't free someone else's string (name)
     }
     fprintf(f, "  </page>\n");
     delete wordlist;
+    
+    delete fontname_prev;
   }
   fprintf(f, "</doc mdda>\n");
+  delete font_name_invalid;
+  delete font_name_null_fix;
 }
 #endif
