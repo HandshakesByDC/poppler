@@ -20,14 +20,29 @@ cmake ..
 make
 
 
-GOODPDF=~/SEER/services/textextract/server/cache/DA350094-CB0B-4C05-9444-762313D4AB98/0/0-original.pdf
-BADPDF=~/SEER/services/pdftodoc/0-original_1571026944371705_CrashOnWilby.pdf
+#GOODPDF=~/SEER/services/textextract/server/cache/DA350094-CB0B-4C05-9444-762313D4AB98/0/0-original.pdf
+#NULLPDF=~/SEER/services/pdftodoc/0-original_1571026944371705_CrashOnWilby.pdf
+
+GOODPDF=../test-pdfs/Ace_Achieve_AR2014.pdf
+NULLPDF=../test-pdfs/0-original_1571026944371705_NullFontNames.pdf
 
 # Bad Fails on 0.37+mdda = N/a
 # Both Work on git head > 0.83.0 = 39baa7d42966ebd67c2ac91ef1c1450965c37e87
 TESTPDF=${GOODPDF}
-TESTPDF=${BADPDF}
+TESTPDF=${NULLPDF}
 ./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ${TESTPDF} -
+
+# TESTS
+./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ${GOODPDF} - | grep '<word xMin="79.34" xMax="116.23" yMin="489.09" yMax="496.53">forty-eight</word>'
+## Expect :
+#no word list (page 1 empty)
+#no word list (page 2 empty)
+#no word list (page 89 empty)
+#  <word xMin="79.34" xMax="116.23" yMin="489.09" yMax="496.53">forty-eight</word>
+
+./utils/pdftotext -q -r 72 -bbox -enc UTF-8 ${NULLPDF} - | grep '<word xMin="90.00" xMax="105.57" yMin="576.55" yMax="585.88">Tel:</word>'
+## Expect :
+#  <word xMin="90.00" xMax="105.57" yMin="576.55" yMax="585.88">Tel:</word>
 
 
 
