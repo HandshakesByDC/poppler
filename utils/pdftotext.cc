@@ -73,6 +73,7 @@ static void printInfoString(FILE *f, Dict *infoDict, const char *key,
 static void printInfoDate(FILE *f, Dict *infoDict, const char *key, const char *fmt);
 void printDocBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last);
 void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last);
+void printWordBBoxAlistairParser(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last);
 
 static int firstPage = 1;
 static int lastPage = 0;
@@ -97,6 +98,7 @@ static bool quiet = false;
 static bool printVersion = false;
 static bool printHelp = false;
 static bool printEnc = false;
+static bool alistairParser = false;
 
 static const ArgDesc argDesc[] = {
   {"-f",       argInt,      &firstPage,     0,
@@ -151,6 +153,8 @@ static const ArgDesc argDesc[] = {
    "print usage information"},
   {"-?",       argFlag,     &printHelp,     0,
    "print usage information"},
+  {"-alistair", argFlag,    &alistairParser,     0,
+   "Turn on this flag if using alistair parser"},
   {}
 };
 
@@ -377,13 +381,17 @@ int main(int argc, char *argv[]) {
     if (textOut->isOk()) {
       textOut->setTextEOL(textEOL);
       if (noPageBreaks) {
-	textOut->setTextPageBreaks(false);
+	      textOut->setTextPageBreaks(false);
       }
       if (bboxLayout) {
         printDocBBox(f, doc, textOut, firstPage, lastPage);
       }
       else {
-        printWordBBox(f, doc, textOut, firstPage, lastPage);
+        if (alistairParser) {
+          printWordBBoxAlistairParser(f, doc, textOut, firstPage, lastPage);
+        } else {
+          printWordBBox(f, doc, textOut, firstPage, lastPage);
+        }
       }
     }
     if (f != stdout) {
@@ -583,6 +591,109 @@ void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int 
 #endif
 
 #ifdef MDDA_VERSION
+
+// this is the version without the de-duplication
+// use this function if using alistair parser
+// only differences between this function and Dr Martin's pdf2doc one is that
+// 1. there is no deduplication
+// 2. we add another piece of font info known as wmode (writing mode), 0 for horizontal text, 1 for vertical text
+// 3. we change the names of the is_bold, is_italic etc in the output XML
+void printWordBBoxAlistairParser(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
+  fprintf(f, "<doc>\n");
+  
+  GooString *font_name_invalid  = new GooString("-FONT-NAME-INVALID-"); 
+  GooString *font_name_null_fix = new GooString("-FONT-NAME-NULL-"); 
+  
+  for (int page = first; page <= last; ++page) {
+    fprintf(f, " <page n=\"%d\" width=\"%.2f\" height=\"%.2f\">\n", page, doc->getPageMediaWidth(page), doc->getPageMediaHeight(page));
+    
+    doc->displayPage(textOut, page, resolution, resolution, 0, true, false, false);
+    
+    TextWordList *wordlist = textOut->makeWordList();
+    const int word_length = wordlist != nullptr ? wordlist->getLength() : 0;
+    
+    TextWord *word;
+    double xMinA, xMaxA, yMinA, yMaxA;
+
+    const TextFontInfo *fontinfo;
+    
+    int is_bold, is_italic; 
+    int wmode;
+    double fontsize;
+    double cr,cg,cb;
+    
+    bool space_after=false;
+    
+    if (word_length == 0) {
+      fprintf(stderr, "no word list (page %d empty)\n", page);
+    }
+    
+    for (int i = 0; i < word_length; ++i) {
+      std::stringstream wordXML;
+      wordXML << std::fixed << std::setprecision(2);
+
+      std::stringstream wordRGB;
+      wordRGB << std::hex << std::setfill('0') << std::setw(2) << std::right;
+      
+      word = wordlist->get(i);
+      word->getBBox(&xMinA, &yMinA, &xMaxA, &yMaxA);
+      const std::string myString = myXmlTokenReplace(word->getText()->c_str());
+      // Major update here
+
+      fontinfo = word->getFontInfo(0);
+      is_bold = fontinfo->isBold() ? 1:0;
+      is_italic = fontinfo->isItalic() ?1:0;
+      wmode = fontinfo->getWMode();
+      fontsize = word->getFontSize(); 
+      const GooString *fontname = word->getFontName(0);  // TEXTOUT_WORD_LIST is defined - looking at [idx=0] font 
+      if(fontname == nullptr) {
+        //printf("fixing null fontname (rare)");
+        fontname=font_name_null_fix->copy();
+      }
+      word->getColor(&cr,&cg,&cb);
+    
+      space_after = word->hasSpaceAfter();
+      
+      wordXML << "  <w x1=\"" << xMinA << "\" x2=\"" << xMaxA << "\"";
+      wordXML << " y1=\"" << yMinA << "\" y2=\"" << yMaxA << "\"";
+      wordXML << " b=\"" << (is_bold?"1":"0") << "\"";
+      wordXML << " i=\"" << (is_italic?"1":"0") << "\"";
+      wordXML << " wm=\"" << std::to_string(wmode) << "\"";
+
+      //printf("fontname[%ld] ", (long)fontname);
+      //printf("fontsize[%ld] ", (long)fontsize);
+      
+      // Caused segfault on BADPDF because some fontnames are NULL : Fix this up above
+      wordXML << " fs=\"" << fontsize << "\" fn=\"" << fontname->c_str() << "\"";
+
+      wordRGB << (int)(cr*255) << "," << (int)(cg*255) << "," << (int)(cb*255);
+      wordXML << " c=\"" << wordRGB.str() << "\"";
+      
+      if( !space_after ) {
+        wordXML << " ns=\"1\"";
+      }
+
+      wordXML << ">" << myString << "</w>\n";
+
+      // New version : 
+      fputs(wordXML.str().c_str(), f);
+
+      // Old version : 
+      //fprintf(f,"    <word xMin=\"%f\" yMin=\"%f\" xMax=\"%f\" yMax=\"%f\">%s</word>\n", xMinA, yMinA, xMaxA, yMaxA, myString.c_str());
+      
+      // delete fontname;  // Don't free someone else's string (word->getFontName(0))
+    }
+    fprintf(f, "  </page>\n");
+    delete wordlist;
+  }
+  fprintf(f, "</doc>\n");
+  delete font_name_invalid;
+  delete font_name_null_fix;
+}
+
+
+// This is the version with de-duplication
+// use this function if using Dr Martin's printWordBBox for pdf2doc
 void printWordBBox(FILE *f, PDFDoc *doc, TextOutputDev *textOut, int first, int last) {
   fprintf(f, "<doc>\n");
   
